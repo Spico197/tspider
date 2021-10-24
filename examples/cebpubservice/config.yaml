@@ -1,0 +1,17 @@
+# # template
+# name: cebpubservice_tenderdocumenttemplate
+# base_list_url: http://www.cebpubservice.com/tenderdocument/mhDocumentLibNoSessionAction/queryTenderdocumentTemplateHtml.do
+
+# hot
+name: cebpubservice_hot_template
+base_list_url: http://www.cebpubservice.com/tenderdocument/mhDocumentLibNoSessionAction/queryTenderdocumentTemplateSearchAll.do
+
+output_dir: outputs
+download_api: "http://www.cebpubservice.com/tenderdocument/offerrewardAction/breakpointdownload.do"
+proxy_host: "127.0.0.1"
+proxy_port: "26888"
+timeout: 30.0
+start_page_num: 1
+tot_page_num: 138
+sleep: 1.5
+max_request_attempt: 5

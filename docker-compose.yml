@@ -1,0 +1,14 @@
+version: "3"
+
+services:
+  ppl_redis:
+    image: "redis:alpine"
+    ports:
+      - "26887:6379"
+
+  ppl_proxy_pool:
+    image: "jhao104/proxy_pool:latest"
+    ports:
+      - "26888:5010"
+    environment:
+      - DB_CONN=redis://:@ppl_redis:6379/0
