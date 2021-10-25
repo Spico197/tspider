@@ -6,23 +6,34 @@ import urllib.parse
 from pathlib import Path
 from typing import Iterable
 
+import pymongo
 import aiohttp
-from omegaconf import OmegaConf
 from loguru import logger
 
 from tspider.spiders.base import SpiderBase
 from tspider.utils.proxy import ProxyManager
+from tspider.db.mongo import MongoDBCollection
+from tspider.utils.time import get_now
 
 
 class CebPubServiceSpider(SpiderBase):
     def __init__(self, config_filepath: str):
-        self.config = OmegaConf.load(config_filepath)
+        super().__init__(config_filepath)
 
-        super().__init__(self.config.name, self.config.output_dir)
-
-        self.timeout = aiohttp.ClientTimeout(total=self.config.timeout)
         self.base_list_url = self.config.base_list_url
+        self.timeout = aiohttp.ClientTimeout(total=self.config.timeout)
         self.proxy_manager = ProxyManager(self.config.proxy_host, self.config.proxy_port)
+        self.db_manager = MongoDBCollection(
+            self.config.mongo_host,
+            self.config.mongo_port,
+            self.config.mongo_db,
+            self.config.mongo_collection
+        )
+        self.db_manager.collection.create_index(
+            [("document_id", pymongo.TEXT)],
+            unique=True,
+            name="document_index"
+        )
 
     async def get_one_url_list(self, url: str, page_num: int) -> Iterable[str]:
         post_headers = {
@@ -70,8 +81,8 @@ class CebPubServiceSpider(SpiderBase):
         return {"object": {"page": {"totalPage": 0}, "list": []}}
 
     async def get_url_list(self, *args, **kwargs) -> Iterable[str]:
-        # url_list only holds documentId here
-        url_list = []
+        # url_set only holds documentId here
+        url_set = set()
         start_page_num = self.config.start_page_num
         tot_page_num = self.config.tot_page_num
         logger.info(f"Total page number: {tot_page_num}")
@@ -91,9 +102,21 @@ class CebPubServiceSpider(SpiderBase):
                     for ins in list_:
                         document_id = ins.get('documentid')
                         if document_id is not None:
-                            url_list.append(document_id)
+                            url_set.add(document_id)
+                            self.db_manager.insert_one({
+                                "document_id": document_id,
+                                "guid": None,
+                                "download_url": None,
+                                "downloaded": False,
+                                "filename": None,
+                                "filepath": None,
+                                "raw_content_disposition": None,
+                                "insert_time": get_now(),
+                                "insert_guid_time": None,
+                                "download_time": None,
+                            })
 
-        return url_list
+        return url_set
 
     async def craw_one(self, document_id: str) -> object:
         guid = await self.get_guid(document_id)
@@ -107,6 +130,14 @@ class CebPubServiceSpider(SpiderBase):
             with self.output_dir.joinpath('download_urls.txt').open('a') as fout:
                 fout.write(f"{download_url}\n")
                 fout.flush()
+            self.db_manager.update_one(
+                {"document_id": document_id},
+                {"$set": {
+                    "guid": guid,
+                    "download_url": download_url,
+                    "insert_guid_time": get_now()
+                }}
+            )
 
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36",
@@ -134,7 +165,20 @@ class CebPubServiceSpider(SpiderBase):
                             if response.status != 200:
                                 return
                             save_status = await self.save_one(response)
-                            if not save_status:
+                            if save_status is not None:
+                                self.db_manager.update_one(
+                                    {"document_id": document_id},
+                                    {
+                                        "$set": {
+                                            "download_time": get_now(),
+                                            "downloaded": True,
+                                            "filename": save_status[0],
+                                            "filepath": str(save_status[1].absolute()),
+                                            "raw_content_disposition": response.headers.get('Content-Disposition'),
+                                        }
+                                    }
+                                )
+                            else:
                                 raise asyncio.TimeoutError("Error Downloading")
                 except aiohttp.client_exceptions.ClientProxyConnectionError:
                     logger.warning(f"Proxy invalid: {proxy}")
@@ -153,12 +197,14 @@ class CebPubServiceSpider(SpiderBase):
     async def save_one(self, response):
         try:
             filename = self.get_filename(response)
+            if len(filename.encode()) > 30:
+                filename = filename[-30:]
             filepath = Path.joinpath(self.output_dir, filename)
             content = await response.read()
             logger.info(f"Save into: {filepath.absolute()}")
             with filepath.open('wb') as fout:
                 fout.write(content)
-            return True
+            return (filename, filepath)
         except aiohttp.client_exceptions.ClientPayloadError:
             logger.error(f"ClientPayloadError {response.url}")
             return False

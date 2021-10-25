@@ -5,12 +5,10 @@ import pymongo
 
 class MongoDBCollection:
     def __init__(
-        self, host: str, port: str,
+        self, host: str, port: int,
         db: str, collection: str,
         username: Optional[str] = None,
-        password: Optional[str] = None,
-        auth_source: Optional[str] = None,
-        auth_mechanism: Optional[str] = None,
+        password: Optional[str] = None
     ):
         self.host = host
         self.port = port
@@ -18,16 +16,11 @@ class MongoDBCollection:
         self.collection_name = collection
         self.username = username
         self.password = password
-        self.auth_source = auth_source
-        self.auth_mechanism = auth_mechanism
 
         self.client = pymongo.MongoClient(
             host, port,
-            db, collection,
             username=username,
-            password=password,
-            auth_source=auth_source,
-            auth_mechanism=auth_mechanism
+            password=password
         )
         self.db = self.client[db]
         self.collection = self.db[collection]

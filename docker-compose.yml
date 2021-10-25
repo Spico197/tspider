@@ -12,3 +12,8 @@ services:
       - "26888:5010"
     environment:
       - DB_CONN=redis://:@ppl_redis:6379/0
+
+  ppl_mongo:
+    image: "mongo"
+    ports:
+      - "26889:27017"
