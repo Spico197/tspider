@@ -23,7 +23,7 @@ class SpiderBase(object):
             if self.stop_signal:
                 raise InterruptedError
 
-            url_set = loop.run_until_complete(self.get_url_list(*args, **kwargs))
+            url_list = loop.run_until_complete(self.get_url_list(*args, **kwargs))
 
             # with self.output_dir.joinpath('url_set.txt').open('wt') as fout:
             #     for url in url_set:
@@ -38,12 +38,14 @@ class SpiderBase(object):
             if self.stop_signal:
                 raise InterruptedError
 
+            logger.info(f"url list len: {len(url_list)}")
+
             """sync"""
-            # for url in url_set:
+            # for url in url_list:
             #     loop.run_until_complete(self.craw_one(url))
 
             """async"""
-            loop.run_until_complete(self.craw_urls(url_set))
+            loop.run_until_complete(self.craw_urls(url_list))
 
         finally:
             loop.close()

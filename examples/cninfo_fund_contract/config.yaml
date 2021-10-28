@@ -1,0 +1,21 @@
+# # template
+# name: cebpubservice_tenderdocumenttemplate
+# base_list_url: http://www.cebpubservice.com/tenderdocument/mhDocumentLibNoSessionAction/queryTenderdocumentTemplateHtml.do
+
+# hot
+name: cninfo_fund_contract
+base_url: http://www.cninfo.com.cn
+base_list_url: http://www.cninfo.com.cn/new/fulltextSearch/full
+output_dir: outputs
+download_base_url: http://static.cninfo.com.cn/
+proxy_host: "localhost"
+proxy_port: "26888"
+mongo_host: "localhost"
+mongo_port: 27018
+mongo_db: cninfo
+mongo_collection: ${name}
+timeout: 10.0
+start_page_num: 501
+tot_page_num: 1000
+sleep: 1.5
+max_request_attempt: 5
